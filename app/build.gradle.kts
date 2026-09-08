@@ -88,6 +88,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("com.mikepenz:material-design-iconic-typeface:2.2.0.8-kotlin")
+    implementation("com.mikepenz:community-material-typeface:7.0.96.2-kotlin@aar")
     implementation("com.google.code.gson:gson:2.13.1")
     implementation(libs.androidx.constraintlayout)
     implementation("androidx.security:security-crypto-ktx:1.1.0-beta01") // Updated to beta
