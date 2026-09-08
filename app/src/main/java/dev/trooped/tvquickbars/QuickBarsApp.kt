@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentActivity: Activity? = null
+    private var revenueCatConfigured = false
 
     /**
      * Called when the application is starting, before any activity, service, or receiver objects
@@ -35,7 +36,8 @@ class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
      *
      * This implementation initializes the application singleton, sets up default preferences,
      * warms up secure storage, and checks for demo mode activation. It also configures
-     * RevenueCat for subscription management and ensures a unique application ID is generated.
+     * RevenueCat for subscription management when an API key is available and ensures a unique
+     * application ID is generated.
      */
     override fun onCreate() {
         super.onCreate()
@@ -60,14 +62,21 @@ class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
         //clearHaCredentials()
         //IntegrationPrefs.clearPairing(ctx = this)
 
-        Purchases.configure(
-            PurchasesConfiguration.Builder(this, BuildConfig.REVENUECAT_API_KEY).build()
-        )
+        // RevenueCat is optional for local/development builds. The public application must
+        // provide BuildConfig.REVENUECAT_API_KEY, but a local build without a key must still
+        // start normally. Premium status remains false until RevenueCat is configured.
+        val revenueCatApiKey = BuildConfig.REVENUECAT_API_KEY
+        if (revenueCatApiKey.isNotBlank()) {
+            Purchases.configure(
+                PurchasesConfiguration.Builder(this, revenueCatApiKey).build()
+            )
 
-        Purchases.sharedInstance.updatedCustomerInfoListener =
-            UpdatedCustomerInfoListener { info: CustomerInfo ->
-                PlusStatusManager.update(info)
-            }
+            Purchases.sharedInstance.updatedCustomerInfoListener =
+                UpdatedCustomerInfoListener { info: CustomerInfo ->
+                    PlusStatusManager.update(info)
+                }
+            revenueCatConfigured = true
+        }
 
         AppIdProvider.ensure(applicationContext) // Create a QuickBars ID instance
     }
@@ -80,7 +89,9 @@ class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
 
     override fun onTerminate() {
         FixedNotificationController.stop()
-        Purchases.sharedInstance.updatedCustomerInfoListener = null
+        if (revenueCatConfigured) {
+            Purchases.sharedInstance.updatedCustomerInfoListener = null
+        }
         super.onTerminate()
     }
 
