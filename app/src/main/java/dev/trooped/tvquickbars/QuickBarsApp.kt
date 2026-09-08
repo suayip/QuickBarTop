@@ -11,6 +11,7 @@ import com.revenuecat.purchases.PurchasesConfiguration
 import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 import dev.trooped.tvquickbars.persistence.AppPrefs
 import dev.trooped.tvquickbars.data.AppIdProvider
+import dev.trooped.tvquickbars.notification.FixedNotificationController
 import dev.trooped.tvquickbars.persistence.SecurePrefsManager
 import dev.trooped.tvquickbars.utils.DemoModeManager
 import dev.trooped.tvquickbars.utils.PlusStatusManager
@@ -41,6 +42,10 @@ class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
         instance = this
 
         AppPrefs.ensureShowToastOnEntityTriggerDefault(this)
+
+        // Local-only top overlay: the clock is driven by this device's own local time.
+        // It does not create a Home Assistant connection or any additional socket.
+        FixedNotificationController.start(applicationContext)
 
         appScope.launch {
             // warm up keystore + cache token once
@@ -74,6 +79,7 @@ class QuickBarsApp : Application(), Application.ActivityLifecycleCallbacks {
     }
 
     override fun onTerminate() {
+        FixedNotificationController.stop()
         Purchases.sharedInstance.updatedCustomerInfoListener = null
         super.onTerminate()
     }
