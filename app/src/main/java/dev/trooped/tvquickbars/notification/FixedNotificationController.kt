@@ -32,11 +32,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mikepenz.iconics.typeface.library.community.material.CommunityMaterial
 import dev.trooped.tvquickbars.R
 import dev.trooped.tvquickbars.services.ComposeViewLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +67,7 @@ object FixedNotificationController {
     private var lifecycleOwner: ComposeViewLifecycleOwner? = null
 
     private var notifications by mutableStateOf<Map<String, FixedNotification>>(emptyMap())
+    private var clockTick by mutableStateOf(0L)
     private val expirationJobs = mutableMapOf<String, Job>()
 
     fun start(context: Context) {
@@ -270,6 +273,9 @@ object FixedNotificationController {
 
     @Composable
     private fun FixedOverlay(items: Map<String, FixedNotification>) {
+        // Read the state so Compose recomposes once per second even when notifications do not change.
+        clockTick
+
         val ordered = items.values
             .sortedWith(compareByDescending<FixedNotification> { it.index }.thenBy { it.id })
 
@@ -301,7 +307,8 @@ object FixedNotificationController {
         // The clock is derived exclusively from the Android TV's local clock.
         LaunchedEffect(Unit) {
             while (true) {
-                delay(30_000L)
+                delay(1000L)
+                clockTick = System.currentTimeMillis()
             }
         }
     }
@@ -329,7 +336,7 @@ object FixedNotificationController {
             horizontalArrangement = Arrangement.Center
         ) {
             item.icon?.let { icon ->
-                FixedIcon(icon)
+                FixedIcon(icon, item.iconColor)
                 if (item.message.isNotBlank() && !isCircle) Spacer(Modifier.width(6.dp))
             }
 
@@ -346,16 +353,34 @@ object FixedNotificationController {
     }
 
     @Composable
-    private fun FixedIcon(value: String) {
+    private fun FixedIcon(value: String, color: Color) {
         val context = LocalContext.current
-        val data = when {
-            value.startsWith("mdi:") ->
-                "https://api.iconify.design/${value.replace(":", "%3A")}.svg"
-            else -> value
+
+        if (value.startsWith("mdi:", ignoreCase = true)) {
+            val name = value.substringAfter(':').trim()
+                .lowercase()
+                .replace('-', '_')
+                .let { "cmd_$it" }
+
+            val icon = CommunityMaterial.Icon.values().firstOrNull { it.name == name }
+                ?: CommunityMaterial.Icon2.values().firstOrNull { it.name == name }
+
+            if (icon != null) {
+                Text(
+                    text = icon.character.toString(),
+                    color = color,
+                    fontSize = 26.sp,
+                    fontFamily = FontFamily(CommunityMaterial.rawTypeface),
+                    modifier = Modifier.size(26.dp),
+                    maxLines = 1
+                )
+            }
+            return
         }
 
+        // Preserve support for non-MDI image URLs. MDI icons themselves never use the network.
         AsyncImage(
-            model = ImageRequest.Builder(context).data(data).build(),
+            model = ImageRequest.Builder(context).data(value).build(),
             contentDescription = null,
             modifier = Modifier.size(26.dp),
             contentScale = ContentScale.Fit
