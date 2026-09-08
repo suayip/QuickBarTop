@@ -5,12 +5,13 @@ import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import dev.trooped.tvquickbars.data.AppIdProvider
 import dev.trooped.tvquickbars.ha.ws.HaClientBridge
+import dev.trooped.tvquickbars.notification.FixedNotificationController
 import dev.trooped.tvquickbars.notification.NotificationSpec
 import dev.trooped.tvquickbars.notification.toNotificationSpec
 import org.json.JSONObject
 
 class QuickBarsNotifyHandler : dev.trooped.tvquickbars.ha.ws.WsHandler {
-    private val TAG = "QuickBarsNotifyHandler" // Optional: for logging
+    private val TAG = "QuickBarsNotifyHandler"
 
     override fun canHandle(event: JSONObject): Boolean =
         event.optString("event_type") == "quickbars.notify"
@@ -25,12 +26,19 @@ class QuickBarsNotifyHandler : dev.trooped.tvquickbars.ha.ws.WsHandler {
 
         val data = event.optJSONObject("data") ?: return
 
-        val targetId = data.optString("id", "")         // set by HA service
+        // Fixed notifications deliberately use the same already-open HA WebSocket and
+        // quickbars.notify event subscription. Setting fixed=true switches only the UI
+        // handling; no additional connection is created.
+        if (data.optBoolean("fixed", false)) {
+            FixedNotificationController.updateFromEvent(context, data)
+            return
+        }
+
+        val targetId = data.optString("id", "")
         val myId = AppIdProvider.get(context) ?: ""
         if (targetId.isNotEmpty() && !targetId.equals(myId, ignoreCase = true)) {
-            return // not for this TV → ignore
+            return
         }
-        // If targetId is missing, we accept it, per the notifications design.
 
         val cid = data.optString("cid", null)
         val spec: NotificationSpec = data.toNotificationSpec(cid)
